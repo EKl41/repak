@@ -10,6 +10,9 @@ pub mod utils;
 
 pub use {data::PartialEntry, error::*, pak::*, profile::{normalize_joined_path, PakProfile}};
 
+#[cfg(feature = "oodle")]
+pub use oodle_loader::CompressionLevel as OodleCompressionLevel;
+
 pub const MAGIC: u32 = 0x5A6F12E1;
 
 #[derive(

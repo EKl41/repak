@@ -195,6 +195,7 @@ impl<D: AsRef<[u8]>> PartialEntry<D> {
 
 pub(crate) fn build_partial_entry<D>(
     allowed_compression: &[Compression],
+    oodle_level: OodleLevelOpt,
     data: D,
     #[allow(unused)] key: &super::Key,
     profile: crate::PakProfile,
@@ -232,7 +233,7 @@ where
             let mut compressed_data = vec![];
             let mut blocks = vec![];
             for chunk in data.as_ref().chunks(compression_block_size as usize) {
-                let mut data = compress(compression, chunk)?;
+                let mut data = compress(compression, oodle_level, chunk)?;
                 if encrypted {
                     pad_zeros_to_alignment(&mut data, 16);
                 }
@@ -297,7 +298,11 @@ where
 }
 
 #[cfg(feature = "compression")]
-fn compress(compression: Compression, data: &[u8]) -> Result<Vec<u8>> {
+fn compress(
+    compression: Compression,
+    oodle_level: OodleLevelOpt,
+    data: &[u8],
+) -> Result<Vec<u8>> {
     use std::io::Write;
 
     let compressed = match compression {
@@ -320,14 +325,21 @@ fn compress(compression: Compression, data: &[u8]) -> Result<Vec<u8>> {
             return Err(super::Error::Oodle);
             #[cfg(feature = "oodle")]
             {
+                let lvl = oodle_level.unwrap_or(oodle_loader::CompressionLevel::Normal);
                 oodle_loader::oodle().unwrap().compress(
                     data.as_ref(),
                     oodle_loader::Compressor::Kraken,
-                    oodle_loader::CompressionLevel::Normal,
+                    lvl,
                 )?
             }
         }
     };
 
+    let _ = oodle_level;
     Ok(compressed)
 }
+
+#[cfg(feature = "oodle")]
+pub(crate) type OodleLevelOpt = Option<oodle_loader::CompressionLevel>;
+#[cfg(not(feature = "oodle"))]
+pub(crate) type OodleLevelOpt = Option<core::convert::Infallible>;

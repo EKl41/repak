@@ -104,14 +104,22 @@ impl Entry {
         version: Version,
         compression_slots: &mut Vec<Option<Compression>>,
         allowed_compression: &[Compression],
+        oodle_level: crate::data::OodleLevelOpt,
         data: &[u8],
         #[allow(unused)] key: &super::Key,
         profile: crate::PakProfile,
         mount_point: &str,
         path: &str,
     ) -> Result<Self, Error> {
-        let partial_entry =
-            build_partial_entry(allowed_compression, data, key, profile, mount_point, path)?;
+        let partial_entry = build_partial_entry(
+            allowed_compression,
+            oodle_level,
+            data,
+            key,
+            profile,
+            mount_point,
+            path,
+        )?;
         let stream_position = writer.stream_position()?;
         let entry = partial_entry.build_entry(version, compression_slots, stream_position)?;
         entry.write(writer, version, crate::entry::EntryLocation::Data)?;

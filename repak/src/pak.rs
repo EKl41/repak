@@ -22,6 +22,7 @@ pub struct PakBuilder {
     key: super::Key,
     allowed_compression: Vec<Compression>,
     profile: PakProfile,
+    oodle_level: crate::data::OodleLevelOpt,
 }
 
 impl Default for PakBuilder {
@@ -36,6 +37,7 @@ impl PakBuilder {
             key: Default::default(),
             allowed_compression: Default::default(),
             profile: Default::default(),
+            oodle_level: None,
         }
     }
     #[cfg(feature = "encryption")]
@@ -46,6 +48,14 @@ impl PakBuilder {
     #[cfg(feature = "compression")]
     pub fn compression(mut self, compression: impl IntoIterator<Item = Compression>) -> Self {
         self.allowed_compression = compression.into_iter().collect();
+        self
+    }
+    /// Override the Oodle compression level used for entries compressed with
+    /// `Compression::Oodle`. Default is `CompressionLevel::Normal`. Has no effect
+    /// for other compression methods.
+    #[cfg(feature = "oodle")]
+    pub fn oodle_level(mut self, level: oodle_loader::CompressionLevel) -> Self {
+        self.oodle_level = Some(level);
         self
     }
     pub fn profile(mut self, profile: PakProfile) -> Self {
@@ -77,6 +87,7 @@ impl PakBuilder {
             mount_point,
             path_hash_seed,
             self.allowed_compression,
+            self.oodle_level,
         )
     }
 }
@@ -93,6 +104,7 @@ pub struct PakWriter<W: Write + Seek> {
     writer: W,
     key: super::Key,
     allowed_compression: Vec<Compression>,
+    oodle_level: crate::data::OodleLevelOpt,
 }
 
 #[derive(Debug, Clone)]
@@ -288,6 +300,7 @@ impl PakReader {
             pak: self.pak,
             key: self.key,
             writer,
+            oodle_level: None,
         })
     }
 }
@@ -301,12 +314,14 @@ impl<W: Write + Seek> PakWriter<W> {
         mount_point: String,
         path_hash_seed: Option<u64>,
         allowed_compression: Vec<Compression>,
+        oodle_level: crate::data::OodleLevelOpt,
     ) -> Self {
         PakWriter {
             pak: Pak::new(profile, version, mount_point, path_hash_seed),
             writer,
             key,
             allowed_compression,
+            oodle_level,
         }
     }
 
@@ -331,6 +346,7 @@ impl<W: Write + Seek> PakWriter<W> {
                 } else {
                     &[]
                 },
+                self.oodle_level,
                 data.as_ref(),
                 &self.key,
                 self.pak.profile,
@@ -348,6 +364,7 @@ impl<W: Write + Seek> PakWriter<W> {
             key: self.key.clone(),
             mount_point: self.pak.mount_point.clone(),
             profile: self.pak.profile,
+            oodle_level: self.oodle_level,
         }
     }
 
@@ -395,6 +412,7 @@ pub struct EntryBuilder {
     key: super::Key,
     mount_point: String,
     profile: PakProfile,
+    oodle_level: crate::data::OodleLevelOpt,
 }
 impl EntryBuilder {
     /// Builds an entry in memory (compressed if requested) which must be written out later
@@ -411,6 +429,7 @@ impl EntryBuilder {
         };
         build_partial_entry(
             compression,
+            self.oodle_level,
             data,
             &self.key,
             self.profile,
