@@ -274,21 +274,26 @@ where
         match &mut data {
             PartialEntryData::Slice(_) => unreachable!(),
             PartialEntryData::Blocks { data, .. } => {
-                let limit = (profile.encrypt_prefix)(mount_point, path, data.len());
-                let limit = if limit > data.len() {
-                    pad_zeros_to_alignment(data, 16);
-                    data.len()
-                } else {
-                    limit
-                };
+                // AES needs whole 16-byte blocks; uncompressed entries arrive unpadded, so pad the
+                // buffer. The index records the logical (unpadded) size below, so extraction trims it.
+                pad_zeros_to_alignment(data, 16);
+                let limit = (profile.encrypt_prefix)(mount_point, path, data.len()).min(data.len());
                 encrypt(profile, key, &mut data[..limit]);
             }
         }
     }
 
+    // Uncompressed entries report their logical size (the engine keeps the index unpadded despite
+    // the on-disk AES padding); compressed entries report the padded block size as before.
+    let compressed_size = if compression.is_none() {
+        uncompressed_size
+    } else {
+        data.as_ref().len() as u64
+    };
+
     Ok(PartialEntry {
         compression,
-        compressed_size: data.as_ref().len() as u64,
+        compressed_size,
         uncompressed_size,
         compression_block_size,
         data,
